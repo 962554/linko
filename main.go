@@ -5,7 +5,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -82,13 +81,12 @@ func initializeLogger(logFile string, bufSize int) (*slog.Logger, closeFunc, err
 			return nil, nil, fmt.Errorf("failed to open log file: %w", err)
 		}
 		bufferedFile := bufio.NewWriterSize(file, bufSize)
-		multiWriter := io.MultiWriter(os.Stderr, bufferedFile)
 		close := func() error {
 			err := bufferedFile.Flush()
 			file.Close()
 			return err
 		}
-		infoHandler := slog.NewTextHandler(multiWriter, &slog.HandlerOptions{
+		infoHandler := slog.NewJSONHandler(bufferedFile, &slog.HandlerOptions{
 			Level: slog.LevelInfo,
 		})
 
