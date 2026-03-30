@@ -72,6 +72,10 @@ func run(ctx context.Context, cancel context.CancelFunc, httpPort int, dataDir s
 }
 
 func initializeLogger(logFile string, bufSize int) (*slog.Logger, closeFunc, error) {
+	debugHandler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	})
+
 	if logFile != "" {
 		file, err := os.OpenFile(logFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o644)
 		if err != nil {
@@ -84,9 +88,12 @@ func initializeLogger(logFile string, bufSize int) (*slog.Logger, closeFunc, err
 			file.Close()
 			return err
 		}
-		// return log.New(multiWriter, "", log.LstdFlags), close, nil
-		return slog.New(slog.NewTextHandler(multiWriter, nil)), close, nil
+		infoHandler := slog.NewTextHandler(multiWriter, &slog.HandlerOptions{
+			Level: slog.LevelInfo,
+		})
+
+		return slog.New(slog.NewMultiHandler(debugHandler, infoHandler)), close, nil
+
 	}
-	// return log.New(os.Stderr, "", log.LstdFlags), func() error { return nil }, nil
-	return slog.New(slog.NewTextHandler(os.Stderr, nil)), func() error { return nil }, nil
+	return slog.New(debugHandler), func() error { return nil }, nil
 }
