@@ -54,7 +54,7 @@ func (s *server) start() error {
 		return err
 	}
 	port := ln.Addr().(*net.TCPAddr).Port
-	s.logger.Info(fmt.Sprintf("Linko is running on http://localhost:%d\n", port))
+	s.logger.Debug(fmt.Sprintf("Linko is running on http://localhost:%d\n", port))
 	return nil
 }
 
