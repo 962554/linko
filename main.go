@@ -24,6 +24,11 @@ type stackTracer interface {
 	StackTrace() pkgerr.StackTrace
 }
 
+type multiError interface {
+	error
+	Unwrap() []error
+}
+
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 
@@ -112,12 +117,25 @@ func replaceAttr(groups []string, a slog.Attr) slog.Attr {
 		if !ok {
 			return a
 		}
-		attrs := linkoerr.Attrs(err)
-		if stackErr, ok := errors.AsType[stackTracer](err); ok {
-			attrs = append(attrs, slog.Attr{
+
+		if me, ok := a.Value.Any().(multiError); ok {
+			var errAttrs []slog.Attr
+			for i, err := range me.Unwrap() {
+				group := slog.GroupAttrs(fmt.Sprintf("error_%d", i+1), linkoerr.Attrs(err)...)
+				errAttrs = append(errAttrs, group)
+			}
+			return slog.GroupAttrs("errors", errAttrs...)
+		}
+		attrs := []slog.Attr{
+			{
 				Key:   "message",
-				Value: slog.StringValue(stackErr.Error()),
-			}, slog.Attr{
+				Value: slog.StringValue(err.Error()),
+			},
+		}
+
+		if stackErr, ok := errors.AsType[stackTracer](err); ok {
+			attrs = append(attrs, linkoerr.Attrs(err)...)
+			attrs = append(attrs, slog.Attr{
 				Key:   "stack_trace",
 				Value: slog.StringValue(fmt.Sprintf("%+v", stackErr.StackTrace())),
 			})
