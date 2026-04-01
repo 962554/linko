@@ -12,9 +12,10 @@ import (
 	"syscall"
 	"time"
 
-	"boot.dev/linko/internal/build"
-	"boot.dev/linko/internal/linkoerr"
-	"boot.dev/linko/internal/store"
+	"962554/linko/internal/build"
+	"962554/linko/internal/linkoerr"
+	"962554/linko/internal/store"
+
 	pkgerr "github.com/pkg/errors"
 )
 
