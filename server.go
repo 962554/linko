@@ -8,7 +8,9 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"time"
 
+	"962554/linko/internal/spy"
 	"962554/linko/internal/store"
 )
 
@@ -74,11 +76,24 @@ func (s *server) handlerShutdown(w http.ResponseWriter, r *http.Request) {
 func requestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			next.ServeHTTP(w, r)
+			start := time.Now()
+
+			// update r with spy.Reader
+			spyReader := &spy.ReadCloser{ReadCloser: r.Body}
+			r.Body = spyReader
+
+			// update w with spy.Writer
+			spyWriter := &spy.ResponseWriter{ResponseWriter: w}
+			next.ServeHTTP(spyWriter, r)
+
 			logger.Info("Served request",
 				slog.String("method", r.Method),
 				slog.String("path", r.URL.Path),
 				slog.String("client_ip", r.RemoteAddr),
+				slog.Duration("duration", time.Since(start)),
+				slog.Int("request_body_bytes", spyReader.BytesRead),
+				slog.Int("response_status", spyWriter.StatusCode),
+				slog.Int("response_body_bytes", spyWriter.BytesWritten),
 			)
 		})
 	}
