@@ -78,6 +78,9 @@ func httpError(ctx context.Context, w http.ResponseWriter, status int, err error
 	if logCtx, ok := ctx.Value(logContextKey).(*LogContext); ok {
 		logCtx.Error = err
 	}
+	if status == http.StatusUnauthorized || status == http.StatusForbidden || status == http.StatusInternalServerError {
+		err = errors.New(http.StatusText(status))
+	}
 	http.Error(w, err.Error(), status)
 }
 
