@@ -110,21 +110,6 @@ func initializeLogger(logFile string, bufSize int) (*slog.Logger, closeFunc, err
 	handlers := []slog.Handler{debugHandler}
 
 	if logFile != "" {
-		// file, err := os.OpenFile(logFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o644)
-		// if err != nil {
-		// 	return nil, nil, fmt.Errorf("failed to open log file: %w", err)
-		// }
-		// bufferedFile := bufio.NewWriterSize(file, bufSize)
-		// close := func() error {
-		// 	err := bufferedFile.Flush()
-		// 	file.Close()
-		// 	return err
-		// }
-		// infoHandler := slog.NewJSONHandler(bufferedFile, &slog.HandlerOptions{
-		// 	Level:       slog.LevelInfo,
-		// 	ReplaceAttr: replaceAttr,
-		// })
-
 		logger := &lumberjack.Logger{
 			Filename:   logFile,
 			MaxSize:    1,
@@ -141,9 +126,7 @@ func initializeLogger(logFile string, bufSize int) (*slog.Logger, closeFunc, err
 			logger.Close()
 			return nil
 		}
-		// return slog.New(slog.NewMultiHandler(debugHandler, infoHandler)), close, nil
 		return slog.New(slog.NewMultiHandler(handlers...)), close, nil
-
 	}
 	return slog.New(debugHandler), func() error { return nil }, nil
 }
