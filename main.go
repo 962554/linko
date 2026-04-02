@@ -6,8 +6,11 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"os/signal"
+	"slices"
+	"strings"
 	"syscall"
 	"time"
 
@@ -132,6 +135,24 @@ func initializeLogger(logFile string, bufSize int) (*slog.Logger, closeFunc, err
 }
 
 func replaceAttr(groups []string, a slog.Attr) slog.Attr {
+	sensitiveKeys := []string{"user", "password", "key", "apikey", "secret", "pin", "creditcardno"}
+	// Replace any potentially sensitive values with the string [REDACTED]
+	if slices.Contains(sensitiveKeys, a.Key) {
+		return slog.String(a.Key, "[REDACTED]")
+	}
+	if a.Key == "long_url" {
+		long_url := a.Value.String()
+		url, err := url.Parse(long_url)
+		if err != nil {
+			return a
+		}
+		if password, ok := url.User.Password(); ok {
+			fmt.Println("micro:", a.Value.String(), password, url.User.String())
+			a.Value = slog.StringValue(strings.Replace(long_url, password, "[REDACTED]", 1))
+		}
+
+	}
+
 	if a.Key == "error" {
 		err, ok := a.Value.Any().(error)
 		if !ok {
