@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -26,7 +27,7 @@ func newServer(store store.Store, port int, logger *slog.Logger, cancel context.
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%d", port),
-		Handler: requestLogger(logger)(mux),
+		Handler: requestLogger(logger)(requestIDHandler()(mux)),
 	}
 
 	s := &server{
@@ -111,6 +112,7 @@ func requestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 				slog.Int("request_body_bytes", spyReader.BytesRead),
 				slog.Int("response_status", spyWriter.StatusCode),
 				slog.Int("response_body_bytes", spyWriter.BytesWritten),
+				slog.String("request_id", w.Header().Get("X-Request-ID")),
 			}
 
 			lc, ok := r.Context().Value(logContextKey).(*LogContext)
@@ -123,6 +125,19 @@ func requestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 			}
 
 			logger.Info("Served request", attrs...)
+		})
+	}
+}
+
+func requestIDHandler() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			requestID := r.Header.Get("X-Request-ID")
+			if requestID == "" {
+				requestID = rand.Text()
+			}
+			w.Header().Set("X-Request-ID", requestID)
+			next.ServeHTTP(w, r)
 		})
 	}
 }
