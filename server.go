@@ -73,6 +73,20 @@ func (s *server) handlerShutdown(w http.ResponseWriter, r *http.Request) {
 	go s.cancel()
 }
 
+func httpError(ctx context.Context, w http.ResponseWriter, status int, err error) {
+	if logCtx, ok := ctx.Value(logContextKey).(*LogContext); ok {
+		logCtx.Error = err
+	}
+	http.Error(w, err.Error(), status)
+}
+
+const logContextKey contextKey = "log_context"
+
+type LogContext struct {
+	Username string
+	Error    error
+}
+
 func requestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -84,9 +98,12 @@ func requestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 
 			// update w with spy.Writer
 			spyWriter := &spy.ResponseWriter{ResponseWriter: w}
+
+			r = r.WithContext(context.WithValue(r.Context(), logContextKey, &LogContext{}))
+
 			next.ServeHTTP(spyWriter, r)
 
-			logger.Info("Served request",
+			attrs := []any{
 				slog.String("method", r.Method),
 				slog.String("path", r.URL.Path),
 				slog.String("client_ip", r.RemoteAddr),
@@ -94,7 +111,18 @@ func requestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 				slog.Int("request_body_bytes", spyReader.BytesRead),
 				slog.Int("response_status", spyWriter.StatusCode),
 				slog.Int("response_body_bytes", spyWriter.BytesWritten),
-			)
+			}
+
+			lc, ok := r.Context().Value(logContextKey).(*LogContext)
+			if ok && lc.Username != "" {
+				attrs = append(attrs, slog.String("user", lc.Username))
+			}
+
+			if ok && lc.Error != nil {
+				attrs = append(attrs, slog.Any("error", lc.Error))
+			}
+
+			logger.Info("Served request", attrs...)
 		})
 	}
 }
