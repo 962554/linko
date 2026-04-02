@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"flag"
@@ -19,6 +18,7 @@ import (
 	"github.com/lmittmann/tint"
 	"github.com/mattn/go-isatty"
 	pkgerr "github.com/pkg/errors"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 type closeFunc func() error
@@ -107,23 +107,42 @@ func initializeLogger(logFile string, bufSize int) (*slog.Logger, closeFunc, err
 		NoColor:     !(isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd())),
 	})
 
-	if logFile != "" {
-		file, err := os.OpenFile(logFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o644)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to open log file: %w", err)
-		}
-		bufferedFile := bufio.NewWriterSize(file, bufSize)
-		close := func() error {
-			err := bufferedFile.Flush()
-			file.Close()
-			return err
-		}
-		infoHandler := slog.NewJSONHandler(bufferedFile, &slog.HandlerOptions{
-			Level:       slog.LevelInfo,
-			ReplaceAttr: replaceAttr,
-		})
+	handlers := []slog.Handler{debugHandler}
 
-		return slog.New(slog.NewMultiHandler(debugHandler, infoHandler)), close, nil
+	if logFile != "" {
+		// file, err := os.OpenFile(logFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o644)
+		// if err != nil {
+		// 	return nil, nil, fmt.Errorf("failed to open log file: %w", err)
+		// }
+		// bufferedFile := bufio.NewWriterSize(file, bufSize)
+		// close := func() error {
+		// 	err := bufferedFile.Flush()
+		// 	file.Close()
+		// 	return err
+		// }
+		// infoHandler := slog.NewJSONHandler(bufferedFile, &slog.HandlerOptions{
+		// 	Level:       slog.LevelInfo,
+		// 	ReplaceAttr: replaceAttr,
+		// })
+
+		logger := &lumberjack.Logger{
+			Filename:   logFile,
+			MaxSize:    1,
+			MaxAge:     28,
+			MaxBackups: 10,
+			LocalTime:  false,
+			Compress:   true,
+		}
+		handlers = append(handlers, slog.NewJSONHandler(logger, &slog.HandlerOptions{
+			ReplaceAttr: replaceAttr,
+		}))
+
+		close := func() error {
+			logger.Close()
+			return nil
+		}
+		// return slog.New(slog.NewMultiHandler(debugHandler, infoHandler)), close, nil
+		return slog.New(slog.NewMultiHandler(handlers...)), close, nil
 
 	}
 	return slog.New(debugHandler), func() error { return nil }, nil
