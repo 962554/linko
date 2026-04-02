@@ -110,7 +110,7 @@ func requestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 			attrs := []any{
 				slog.String("method", r.Method),
 				slog.String("path", r.URL.Path),
-				slog.String("client_ip", r.RemoteAddr),
+				slog.String("client_ip", redactIP(r.RemoteAddr)),
 				slog.Duration("duration", time.Since(start)),
 				slog.Int("request_body_bytes", spyReader.BytesRead),
 				slog.Int("response_status", spyWriter.StatusCode),
@@ -143,4 +143,23 @@ func requestIDHandler() func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func redactIP(hostport string) string {
+	fmt.Println("micro:", hostport)
+	host, _, err := net.SplitHostPort(hostport)
+	if err != nil {
+		return host
+	}
+
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return host
+	}
+
+	ipv4 := ip.To4()
+	if ipv4 == nil {
+		return host
+	}
+	return fmt.Sprintf("%d.%d.%d.x", ipv4[0], ipv4[1], ipv4[2])
 }
