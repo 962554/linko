@@ -30,7 +30,7 @@ func newServer(store store.Store, port int, logger *slog.Logger, cancel context.
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%d", port),
-		Handler: metricsMiddleware(requestIDHandler()(requestLogger(logger)(mux))),
+		Handler: metricsMiddleware(requestID()(requestLogger(logger)(mux))),
 	}
 
 	s := &server{
@@ -139,7 +139,7 @@ func requestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 	}
 }
 
-func requestIDHandler() func(http.Handler) http.Handler {
+func requestID() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			requestID := r.Header.Get("X-Request-ID")
